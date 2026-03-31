@@ -386,12 +386,30 @@ export default function App() {
           style={{ background:!selReg?C.accent:C.bg, color:!selReg?"#fff":C.t3, border:`1px solid ${!selReg?C.accent:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:!selReg?700:400, whiteSpace:"nowrap", flexShrink:0 }}>
           전체
         </button>
-        {Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([r,cnt])=>{
-          const col=RM[r]?.c||"#64748b", active=selReg===r;
+        {[
+          {key:"서울",    label:"서울특별시"},
+          {key:"인천",    label:"인천광역시"},
+          {key:"대전",    label:"대전광역시"},
+          {key:"대구",    label:"대구광역시"},
+          {key:"울산",    label:"울산광역시"},
+          {key:"부산",    label:"부산광역시"},
+          {key:"광주",    label:"광주광역시"},
+          {key:"경기도",  label:"경기도"},
+          {key:"충청남도",label:"충청남도"},
+          {key:"충청북도",label:"충청북도"},
+          {key:"경상남도",label:"경상남도"},
+          {key:"경상북도",label:"경상북도"},
+          {key:"전라남도",label:"전라남도"},
+          {key:"전라북도",label:"전라북도"},
+          {key:"강원도",  label:"강원도"},
+          {key:"세종",    label:"세종시"},
+          {key:"기타",    label:"기타"},
+        ].filter(({key})=>counts[key]>0).map(({key,label})=>{
+          const col=RM[key]?.c||"#64748b", active=selReg===key;
           return (
-            <button key={r} onClick={()=>{ setSelReg(active?null:r); setSelCo(null); setTab("list"); }}
+            <button key={key} onClick={()=>{ setSelReg(active?null:key); setSelCo(null); setTab("list"); }}
               style={{ background:active?col+"22":C.bg, color:active?col:C.t3, border:`1px solid ${active?col:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:active?700:400, whiteSpace:"nowrap", flexShrink:0 }}>
-              {r} {cnt}
+              {label} {counts[key]}
             </button>
           );
         })}
