@@ -117,7 +117,7 @@ function AdminLogin({ onLogin }) {
           value={pw}
           onChange={e=>{ setPw(e.target.value); setError(""); }}
           onKeyDown={e=>e.key==="Enter"&&tryLogin()}
-          style={{ width:"100%", padding:"11px 16px", border:`1px solid ${error??"#fca5a5":C.border}`, borderRadius:8, fontSize:13, color:C.t1, background:C.bg, boxSizing:"border-box", marginBottom:12, outline:"none" }}
+          style={{ width:"100%", padding:"11px 16px", border:`1px solid ${error?"#fca5a5":C.border}`, borderRadius:8, fontSize:13, color:C.t1, background:C.bg, boxSizing:"border-box", marginBottom:12, outline:"none" }}
         />
         {error && <div style={{ color:"#dc2626", fontSize:12, marginBottom:10 }}>⚠ {error}</div>}
         <button onClick={tryLogin}
