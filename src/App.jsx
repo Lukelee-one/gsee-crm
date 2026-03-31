@@ -5,7 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = "https://rynoonrqshhzxpjumhbo.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wkEjmFDHBL88xjARM65LFg_uC9Wio_A";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const ADMIN_PASSWORD = "gsee2024!";
 
 const C = {
@@ -45,7 +44,7 @@ function detectRegion(address = "") {
   return "기타";
 }
 
-function mapRow(row, idx) {
+function mapRow(row) {
   const keys = Object.keys(row);
   const find = (...candidates) => {
     for (const c of candidates) {
@@ -93,45 +92,37 @@ const GROUPS = [
   { name:"강원·제주", regions:["강원도","제주"] },
 ];
 
-// ── 관리자 로그인 화면 ────────────────────────────────────────
-function AdminLogin({ onLogin }) {
+// ── 관리자 로그인 ─────────────────────────────────────────────
+function AdminLogin({ onLogin, onCancel }) {
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
-
   const tryLogin = () => {
-    if (pw === ADMIN_PASSWORD) {
-      sessionStorage.setItem("gsee_admin", "1");
-      onLogin();
-    } else {
-      setError("비밀번호가 틀렸습니다.");
-    }
+    if (pw === ADMIN_PASSWORD) { sessionStorage.setItem("gsee_admin","1"); onLogin(); }
+    else setError("비밀번호가 틀렸습니다.");
   };
-
   return (
-    <div style={{ height:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:C.bg, fontFamily:"'Malgun Gothic',sans-serif" }}>
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:"40px 48px", width:360, boxShadow:"0 4px 24px rgba(0,0,0,0.08)", textAlign:"center" }}>
-        <div style={{ width:52, height:52, background:C.accent, borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, fontWeight:700, color:"#fff", margin:"0 auto 20px" }}>G</div>
-        <div style={{ fontSize:18, fontWeight:700, color:C.t1, marginBottom:6 }}>관리자 로그인</div>
-        <div style={{ fontSize:12, color:C.t3, marginBottom:28 }}>GSEE-TECH KOREA 거래처 관리 시스템</div>
-        <input type="password" placeholder="관리자 비밀번호 입력"
-          value={pw}
-          onChange={e=>{ setPw(e.target.value); setError(""); }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}>
+      <div style={{ background:C.card, borderRadius:16, padding:"36px 32px", width:"100%", maxWidth:360, boxShadow:"0 8px 32px rgba(0,0,0,0.18)" }}>
+        <div style={{ textAlign:"center", marginBottom:24 }}>
+          <div style={{ width:48, height:48, background:C.accent, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:700, color:"#fff", margin:"0 auto 12px" }}>G</div>
+          <div style={{ fontSize:16, fontWeight:700, color:C.t1 }}>관리자 로그인</div>
+          <div style={{ fontSize:12, color:C.t3, marginTop:4 }}>GSEE-TECH KOREA</div>
+        </div>
+        <input type="password" placeholder="관리자 비밀번호"
+          value={pw} onChange={e=>{ setPw(e.target.value); setError(""); }}
           onKeyDown={e=>e.key==="Enter"&&tryLogin()}
-          style={{ width:"100%", padding:"11px 16px", border:`1px solid ${error?"#fca5a5":C.border}`, borderRadius:8, fontSize:13, color:C.t1, background:C.bg, boxSizing:"border-box", marginBottom:12, outline:"none" }}
+          style={{ width:"100%", padding:"12px 16px", border:`1px solid ${error?"#fca5a5":C.border}`, borderRadius:8, fontSize:14, color:C.t1, background:C.bg, boxSizing:"border-box", marginBottom:8, outline:"none" }}
         />
-        {error && <div style={{ color:"#dc2626", fontSize:12, marginBottom:10 }}>⚠ {error}</div>}
-        <button onClick={tryLogin}
-          style={{ width:"100%", padding:"11px", background:C.accent, color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:700, cursor:"pointer" }}>
-          로그인
-        </button>
-        <div style={{ marginTop:16, fontSize:11, color:C.t3 }}>일반 사용자는 메인 URL로 접속하세요</div>
+        {error && <div style={{ color:"#dc2626", fontSize:12, marginBottom:8 }}>⚠ {error}</div>}
+        <button onClick={tryLogin} style={{ width:"100%", padding:12, background:C.accent, color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:700, cursor:"pointer", marginBottom:8 }}>로그인</button>
+        <button onClick={onCancel} style={{ width:"100%", padding:10, background:C.bg, color:C.t3, border:`1px solid ${C.border}`, borderRadius:8, fontSize:13, cursor:"pointer" }}>취소</button>
       </div>
     </div>
   );
 }
 
 // ── 관리자 업로드 패널 ────────────────────────────────────────
-function AdminPanel({ onLogout, onRefresh, companies }) {
+function AdminPanel({ onLogout, onRefresh, total }) {
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -148,17 +139,13 @@ function AdminPanel({ onLogout, onRefresh, companies }) {
         const wb = XLSX.read(e.target.result, { type:"array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
-        const mapped = rows.map((r,i) => mapRow(r,i)).filter(r => r.company);
+        const mapped = rows.map(r => mapRow(r)).filter(r => r.company);
         if (mapped.length === 0) { setMsg("❌ 회사명 컬럼을 찾지 못했습니다."); setLoading(false); return; }
-
-        // 기존 데이터 삭제
-        await supabase.from("companies").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-        // 500개씩 나눠서 삽입
+        await supabase.from("companies").delete().neq("id","00000000-0000-0000-0000-000000000000");
         const chunkSize = 500;
         let hasError = false;
         for (let i = 0; i < mapped.length; i += chunkSize) {
-          const chunk = mapped.slice(i, i + chunkSize);
-          const { error } = await supabase.from("companies").insert(chunk);
+          const { error } = await supabase.from("companies").insert(mapped.slice(i, i + chunkSize));
           if (error) { setMsg("❌ 업로드 실패: " + error.message); hasError = true; break; }
         }
         if (!hasError) { setMsg(`✅ ${mapped.length}개 업체 업로드 완료!`); onRefresh(); }
@@ -168,129 +155,95 @@ function AdminPanel({ onLogout, onRefresh, companies }) {
     reader.readAsArrayBuffer(file);
   }, [onRefresh]);
 
-  const onDrop = useCallback((e) => {
-    e.preventDefault(); setDrag(false);
-    process(e.dataTransfer.files[0]);
-  }, [process]);
+  const onDrop = useCallback((e) => { e.preventDefault(); setDrag(false); process(e.dataTransfer.files[0]); }, [process]);
 
   return (
-    <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"12px 20px", display:"flex", alignItems:"center", gap:16, flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
-      {/* 관리자 배지 */}
-      <div style={{ background:"#fef3c7", border:"1px solid #f59e0b", borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:700, color:"#92400e", flexShrink:0 }}>
-        🔐 관리자 모드
-      </div>
-
-      {/* 드래그 업로드 */}
-      <div
-        onDragOver={e=>{ e.preventDefault(); setDrag(true); }}
-        onDragLeave={()=>setDrag(false)}
-        onDrop={onDrop}
+    <div style={{ background:"#fffbeb", borderBottom:`2px solid #f59e0b`, padding:"10px 16px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, flexShrink:0 }}>
+      <span style={{ fontSize:11, fontWeight:700, color:"#92400e", background:"#fef3c7", border:"1px solid #f59e0b", borderRadius:5, padding:"3px 10px" }}>🔐 관리자</span>
+      <div onDragOver={e=>{ e.preventDefault(); setDrag(true); }} onDragLeave={()=>setDrag(false)} onDrop={onDrop}
         onClick={()=>inputRef.current.click()}
-        style={{ flex:1, maxWidth:400, padding:"8px 16px", border:`2px dashed ${drag?"#0ea5e9":C.border2}`, borderRadius:8, textAlign:"center", cursor:"pointer", background:drag?"#e0f2fe":C.bg, transition:"all 0.2s", fontSize:12, color:C.t3 }}>
-        {loading ? "⏳ 업로드 중..." : "📂 엑셀 파일 드래그 또는 클릭하여 업로드"}
+        style={{ flex:1, minWidth:200, padding:"8px 14px", border:`2px dashed ${drag?"#0ea5e9":C.border2}`, borderRadius:8, textAlign:"center", cursor:"pointer", background:drag?"#e0f2fe":C.card, fontSize:12, color:C.t3 }}>
+        {loading ? "⏳ 업로드 중..." : "📂 엑셀 파일 업로드 (드래그 또는 클릭)"}
         <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }} onChange={e=>process(e.target.files[0])}/>
       </div>
-
-      {/* 메시지 */}
-      {msg && <div style={{ fontSize:12, color:msg.startsWith("✅")?"#16a34a":"#dc2626", fontWeight:600 }}>{msg}</div>}
-
-      {/* 현재 업체 수 */}
-      <div style={{ fontSize:12, color:C.t3 }}>현재 <span style={{ color:C.accent, fontWeight:700 }}>{companies.length}</span>개 업체</div>
-
-      {/* 로그아웃 */}
-      <button onClick={onLogout}
-        style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 14px", fontSize:11, color:C.t2, cursor:"pointer", flexShrink:0 }}>
-        로그아웃
-      </button>
+      {msg && <span style={{ fontSize:12, color:msg.startsWith("✅")?"#16a34a":"#dc2626", fontWeight:600 }}>{msg}</span>}
+      <span style={{ fontSize:12, color:C.t3 }}>총 <b style={{ color:C.accent }}>{total}</b>개</span>
+      <button onClick={onLogout} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:7, padding:"6px 12px", fontSize:11, color:C.t2, cursor:"pointer" }}>로그아웃</button>
     </div>
   );
 }
 
-// ── 지도 컴포넌트 ─────────────────────────────────────────────
+// ── 지도 ──────────────────────────────────────────────────────
 function KoreaMap({ counts, selReg, onReg, filtered, selCo, onCo }) {
   const [hov, setHov] = useState(null);
   const max = Math.max(...Object.values(counts), 1);
   return (
     <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", background:C.bg }}>
-      <svg viewBox="0 0 320 455" style={{ height:"94%", width:"auto", filter:"drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}>
+      <svg viewBox="0 0 320 455" style={{ height:"96%", width:"auto", maxWidth:"100%", filter:"drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}>
         <rect x="0" y="0" width="320" height="455" fill={C.mapBg} rx="10"/>
         <polygon points={OUTLINE} fill={C.mapLand} stroke={C.mapBord} strokeWidth="1.5"/>
         <ellipse cx="88" cy="422" rx="28" ry="12" fill={C.mapLand} stroke={C.mapBord} strokeWidth="1.5"/>
         {Object.entries(RM).filter(([r])=>r!=="기타").map(([reg,pos])=>{
-          const cnt=counts[reg]||0, isSel=selReg===reg, isHov=hov===reg;
-          const r=10+(cnt/max)*16;
+          const cnt=counts[reg]||0, isSel=selReg===reg, isHov=hov===reg, r=10+(cnt/max)*16;
           return (
-            <g key={reg} style={{ cursor:"pointer" }}
-              onClick={()=>onReg(isSel?null:reg)}
-              onMouseEnter={()=>setHov(reg)}
-              onMouseLeave={()=>setHov(null)}>
+            <g key={reg} style={{ cursor:"pointer" }} onClick={()=>onReg(isSel?null:reg)} onMouseEnter={()=>setHov(reg)} onMouseLeave={()=>setHov(null)}>
               {(isSel||isHov)&&<circle cx={pos.x} cy={pos.y} r={r+8} fill={pos.c} opacity={0.2}/>}
-              <circle cx={pos.x} cy={pos.y} r={r} fill={pos.c}
-                opacity={isSel?1:isHov?0.85:cnt>0?0.65:0.25}
-                stroke="#fff" strokeWidth={isSel?2:1}/>
-              {cnt>0&&<text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central"
-                style={{ fontSize:9, fill:"#fff", fontWeight:700, pointerEvents:"none", fontFamily:"sans-serif" }}>{cnt}</text>}
-              <text x={pos.x} y={pos.y+r+11} textAnchor="middle"
-                style={{ fontSize:8, fill:isSel?pos.c:C.t3, fontWeight:isSel?700:500, pointerEvents:"none", fontFamily:"sans-serif" }}>{reg}</text>
+              <circle cx={pos.x} cy={pos.y} r={r} fill={pos.c} opacity={isSel?1:isHov?0.85:cnt>0?0.65:0.25} stroke="#fff" strokeWidth={isSel?2:1}/>
+              {cnt>0&&<text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" style={{ fontSize:9, fill:"#fff", fontWeight:700, pointerEvents:"none", fontFamily:"sans-serif" }}>{cnt}</text>}
+              <text x={pos.x} y={pos.y+r+11} textAnchor="middle" style={{ fontSize:8, fill:isSel?pos.c:C.t3, fontWeight:isSel?700:500, pointerEvents:"none", fontFamily:"sans-serif" }}>{reg}</text>
             </g>
           );
         })}
         {filtered.map(c=>{
           const pos=RM[c.region]||RM["기타"], isSel=selCo?.id===c.id;
           const dx=(((c.id*17+5)%28)-14)*0.55, dy=(((c.id*11+3)%28)-14)*0.55;
-          return <circle key={c.id} cx={pos.x+dx} cy={pos.y+dy}
-            r={isSel?5:3} fill={isSel?"#fbbf24":C.t1}
-            opacity={isSel?1:0.5} stroke={isSel?"#f59e0b":"#fff"} strokeWidth={isSel?2:1}
-            style={{ cursor:"pointer" }}
-            onClick={e=>{ e.stopPropagation(); onCo(isSel?null:c); }}/>;
+          return <circle key={c.id} cx={pos.x+dx} cy={pos.y+dy} r={isSel?5:3} fill={isSel?"#fbbf24":C.t1} opacity={isSel?1:0.5} stroke={isSel?"#f59e0b":"#fff"} strokeWidth={isSel?2:1} style={{ cursor:"pointer" }} onClick={e=>{ e.stopPropagation(); onCo(isSel?null:c); }}/>;
         })}
       </svg>
       {hov&&counts[hov]>0&&(
-        <div style={{ position:"absolute", top:16, left:16, background:C.card, border:`1.5px solid ${RM[hov]?.c}`, borderRadius:10, padding:"10px 16px", pointerEvents:"none", zIndex:10, boxShadow:"0 4px 12px rgba(0,0,0,0.12)" }}>
-          <div style={{ color:RM[hov]?.c, fontWeight:700, fontSize:15 }}>{hov}</div>
-          <div style={{ color:C.t2, fontSize:12, marginTop:2 }}>{counts[hov]}개 거래처</div>
+        <div style={{ position:"absolute", top:12, left:12, background:C.card, border:`1.5px solid ${RM[hov]?.c}`, borderRadius:10, padding:"8px 14px", pointerEvents:"none", zIndex:10, boxShadow:"0 4px 12px rgba(0,0,0,0.12)" }}>
+          <div style={{ color:RM[hov]?.c, fontWeight:700, fontSize:14 }}>{hov}</div>
+          <div style={{ color:C.t2, fontSize:12 }}>{counts[hov]}개 거래처</div>
         </div>
       )}
-      <div style={{ position:"absolute", bottom:16, right:16, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"12px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.08)" }}>
-        {[{bg:C.accent,op:0.65,label:"지역 버블 (크기=업체수)"},{bg:"#fbbf24",op:1,label:"선택된 업체"},{bg:C.t1,op:0.5,label:"검색 업체"}].map(({bg,op,label})=>(
-          <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, color:C.t3 }}>
-            <div style={{ width:10, height:10, borderRadius:"50%", background:bg, opacity:op, flexShrink:0 }}/>
-            <span style={{ fontSize:11 }}>{label}</span>
-          </div>
-        ))}
-        <div style={{ color:C.t3, fontSize:10, marginTop:6, borderTop:`1px solid ${C.border}`, paddingTop:6 }}>버블 클릭 → 지역 필터</div>
-      </div>
+      {selReg && (
+        <div style={{ position:"absolute", top:12, right:12 }}>
+          <button onClick={()=>onReg(null)} style={{ background:C.accent, color:"#fff", border:"none", borderRadius:7, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            {selReg} ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── 통계 탭 ───────────────────────────────────────────────────
-function StatsView({ counts, selReg, total }) {
-  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  const maxVal=sorted[0]?.[1]||1;
-  const groups=GROUPS.map(g=>({ ...g, count:g.regions.reduce((s,r)=>s+(counts[r]||0),0), color:RM[g.regions.find(r=>counts[r]>0)]?.c||"#94a3b8" }));
+// ── 통계 ──────────────────────────────────────────────────────
+function StatsView({ counts, total }) {
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const maxVal = sorted[0]?.[1]||1;
+  const groups = GROUPS.map(g=>({ ...g, count:g.regions.reduce((s,r)=>s+(counts[r]||0),0), color:RM[g.regions.find(r=>counts[r]>0)]?.c||"#94a3b8" }));
   return (
-    <div style={{ overflowY:"auto", height:"100%", padding:"24px 28px", background:C.bg }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:28 }}>
+    <div style={{ overflowY:"auto", height:"100%", padding:"16px", background:C.bg }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))", gap:8, marginBottom:20 }}>
         {groups.map(({name,count,color})=>(
-          <div key={name} style={{ background:C.card, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}`, borderRadius:10, padding:"14px 16px", boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
-            <div style={{ color:C.t3, fontSize:11, marginBottom:6 }}>{name}</div>
-            <div style={{ color, fontSize:24, fontWeight:700 }}>{count}</div>
-            <div style={{ color:C.t3, fontSize:11, marginTop:2 }}>{total>0?Math.round(count/total*100):0}%</div>
+          <div key={name} style={{ background:C.card, border:`1px solid ${C.border}`, borderTop:`3px solid ${color}`, borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
+            <div style={{ color:C.t3, fontSize:10, marginBottom:4 }}>{name}</div>
+            <div style={{ color, fontSize:22, fontWeight:700 }}>{count}</div>
+            <div style={{ color:C.t3, fontSize:10 }}>{total>0?Math.round(count/total*100):0}%</div>
           </div>
         ))}
       </div>
-      <div style={{ color:C.t3, fontSize:12, marginBottom:16, fontWeight:600 }}>지역별 세부 현황</div>
+      <div style={{ color:C.t3, fontSize:11, marginBottom:12, fontWeight:600 }}>지역별 현황</div>
       {sorted.map(([reg,cnt])=>{
-        const color=RM[reg]?.c||"#64748b", isSel=reg===selReg;
+        const color=RM[reg]?.c||"#64748b";
         return (
-          <div key={reg} style={{ marginBottom:14, background:C.card, borderRadius:8, padding:"12px 16px", border:`1px solid ${isSel?color:C.border}`, boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8, fontSize:13 }}>
-              <span style={{ color:isSel?color:C.t2, fontWeight:isSel?700:500 }}>{reg}</span>
+          <div key={reg} style={{ marginBottom:10, background:C.card, borderRadius:8, padding:"10px 14px", border:`1px solid ${C.border}` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6, fontSize:13 }}>
+              <span style={{ color:C.t2, fontWeight:500 }}>{reg}</span>
               <span style={{ color:C.t3 }}>{cnt}개 · {total>0?Math.round(cnt/total*100):0}%</span>
             </div>
-            <div style={{ height:7, background:C.bg, borderRadius:4, overflow:"hidden" }}>
-              <div style={{ height:"100%", width:`${(cnt/maxVal)*100}%`, background:color, borderRadius:4, transition:"width 0.5s ease" }}/>
+            <div style={{ height:6, background:C.bg, borderRadius:3, overflow:"hidden" }}>
+              <div style={{ height:"100%", width:`${(cnt/maxVal)*100}%`, background:color, borderRadius:3, transition:"width 0.5s ease" }}/>
             </div>
           </div>
         );
@@ -299,31 +252,59 @@ function StatsView({ counts, selReg, total }) {
   );
 }
 
-// ── 메인 앱 ───────────────────────────────────────────────────
+// ── 업체 상세 모달 ────────────────────────────────────────────
+function DetailModal({ co, onClose }) {
+  if (!co) return null;
+  const color = RM[co.region]?.c||C.accent;
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:500, padding:"0" }}
+      onClick={onClose}>
+      <div style={{ background:C.card, borderRadius:"20px 20px 0 0", padding:"24px 20px 36px", width:"100%", maxWidth:480, boxShadow:"0 -4px 24px rgba(0,0,0,0.15)" }}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{ width:40, height:4, background:C.border2, borderRadius:2, margin:"0 auto 20px" }}/>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+          <div style={{ fontSize:16, fontWeight:700, color, maxWidth:"85%", lineHeight:1.4 }}>{co.company}</div>
+          <button onClick={onClose} style={{ background:C.bg, border:`1px solid ${C.border}`, color:C.t3, borderRadius:6, width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0, cursor:"pointer" }}>×</button>
+        </div>
+        <div style={{ background:C.bg, borderRadius:10, padding:"14px 16px", marginBottom:14 }}>
+          {[["📍 지역",co.region],["🏢 주소",co.address],["👤 담당자",co.contact],["💼 직책",co.title]].filter(([,v])=>v).map(([k,v])=>(
+            <div key={k} style={{ display:"flex", gap:12, marginBottom:8, fontSize:13 }}>
+              <span style={{ color:C.t3, whiteSpace:"nowrap", minWidth:56 }}>{k}</span>
+              <span style={{ color:C.t2, lineHeight:1.5 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+        {co.phone && (
+          <a href={`tel:${co.phone}`} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:color, color:"#fff", borderRadius:10, padding:"14px", fontSize:15, fontWeight:700, textDecoration:"none" }}>
+            📞 {co.phone} 전화하기
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 메인 ──────────────────────────────────────────────────────
 export default function App() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
   const [selReg, setSelReg]       = useState(null);
   const [selCo, setSelCo]         = useState(null);
-  const [tab, setTab]             = useState("map");
+  const [tab, setTab]             = useState("list");
   const [isAdmin, setIsAdmin]     = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
-  // Supabase에서 데이터 불러오기
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from("companies").select("*");
-    if (!error && data) {
-      setCompanies(data.map((r,i)=>({ ...r, id: i+1 })));
-    }
+    if (!error && data) setCompanies(data.map((r,i)=>({ ...r, id:i+1 })));
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchData();
-    // 관리자 세션 확인
-    if (sessionStorage.getItem("gsee_admin") === "1") setIsAdmin(true);
+    if (sessionStorage.getItem("gsee_admin")==="1") setIsAdmin(true);
   }, [fetchData]);
 
   const counts = useMemo(()=>{
@@ -341,165 +322,145 @@ export default function App() {
     });
   },[search,selReg,companies]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("gsee_admin");
-    setIsAdmin(false);
-  };
-
-  // 관리자 로그인 화면
-  if (showLogin && !isAdmin) {
-    return <AdminLogin onLogin={()=>{ setIsAdmin(true); setShowLogin(false); }}/>;
-  }
-
-  const selColor = selCo?(RM[selCo.region]?.c||C.accent):C.accent;
+  const handleLogout = () => { sessionStorage.removeItem("gsee_admin"); setIsAdmin(false); };
 
   return (
-    <div style={{ fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", background:C.bg, color:C.t1, height:"100vh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+    <div style={{ fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", background:C.bg, color:C.t1, height:"100dvh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
       <style>{`
-        *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:5px}
-        ::-webkit-scrollbar-thumb{background:${C.border2};border-radius:3px}
-        .ccard{transition:background 0.12s}
-        .ccard:hover{background:${C.bg}!important}
-        input{outline:none;font-family:'Malgun Gothic',sans-serif}
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar-thumb{background:${C.border2};border-radius:2px}
+        .ccard{transition:background 0.1s}
+        .ccard:active{background:${C.bg}!important}
+        input{outline:none;font-family:'Malgun Gothic',sans-serif;-webkit-appearance:none}
         input::placeholder{color:${C.t3}}
-        button{cursor:pointer;font-family:'Malgun Gothic',sans-serif}
+        button{cursor:pointer;font-family:'Malgun Gothic',sans-serif;-webkit-appearance:none}
+        a{-webkit-tap-highlight-color:transparent}
       `}</style>
 
-      {/* 관리자 업로드 패널 */}
-      {isAdmin && <AdminPanel onLogout={handleLogout} onRefresh={fetchData} companies={companies}/>}
+      {/* 관리자 패널 */}
+      {isAdmin && <AdminPanel onLogout={handleLogout} onRefresh={fetchData} total={companies.length}/>}
 
       {/* 헤더 */}
-      <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"10px 20px", display:"flex", alignItems:"center", gap:16, flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:36, height:36, background:C.accent, borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:"#fff" }}>G</div>
-          <div>
-            <div style={{ fontSize:13, fontWeight:700, color:C.t1, letterSpacing:"0.03em" }}>GSEE-TECH KOREA</div>
-            <div style={{ fontSize:10, color:C.t3, letterSpacing:"0.1em" }}>거래처 관리 시스템</div>
+      <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"10px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+          <div style={{ width:32, height:32, background:C.accent, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:700, color:"#fff" }}>G</div>
+          <div style={{ display:"none" }} className="desktop-logo">
+            <div style={{ fontSize:12, fontWeight:700, color:C.t1 }}>GSEE-TECH KOREA</div>
+            <div style={{ fontSize:9, color:C.t3 }}>거래처 관리 시스템</div>
           </div>
         </div>
 
-        <div style={{ flex:1, maxWidth:380 }}>
-          <div style={{ position:"relative" }}>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, color:C.t3, pointerEvents:"none" }}>🔍</span>
-            <input type="text" placeholder="회사명, 담당자, 주소, 직책 검색..."
-              value={search} onChange={e=>{ setSearch(e.target.value); setSelCo(null); }}
-              style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 14px 8px 36px", color:C.t1, fontSize:13 }}/>
-          </div>
+        {/* 검색 */}
+        <div style={{ flex:1, position:"relative" }}>
+          <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", fontSize:14, color:C.t3, pointerEvents:"none" }}>🔍</span>
+          <input type="text" placeholder="회사명, 담당자 검색..."
+            value={search} onChange={e=>{ setSearch(e.target.value); setSelCo(null); }}
+            style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px 8px 32px", color:C.t1, fontSize:13 }}/>
         </div>
 
-        <div style={{ display:"flex", gap:28, marginLeft:"auto" }}>
-          {[["전체 거래처",companies.length],["등록 지역",Object.keys(counts).length],["검색 결과",filtered.length]].map(([label,val])=>(
-            <div key={label} style={{ textAlign:"center" }}>
-              <div style={{ color:C.accent, fontSize:20, fontWeight:700, lineHeight:1 }}>{val}</div>
-              <div style={{ color:C.t3, fontSize:10, marginTop:3 }}>{label}</div>
-            </div>
-          ))}
+        {/* 통계 */}
+        <div style={{ display:"flex", gap:14, flexShrink:0 }}>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ color:C.accent, fontSize:16, fontWeight:700, lineHeight:1 }}>{companies.length}</div>
+            <div style={{ color:C.t3, fontSize:9 }}>전체</div>
+          </div>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ color:C.accent, fontSize:16, fontWeight:700, lineHeight:1 }}>{filtered.length}</div>
+            <div style={{ color:C.t3, fontSize:9 }}>검색</div>
+          </div>
         </div>
 
         {/* 관리자 버튼 */}
         {!isAdmin && (
           <button onClick={()=>setShowLogin(true)}
-            style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 14px", fontSize:11, color:C.t3, flexShrink:0 }}>
-            🔐 관리자
+            style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:7, padding:"7px 10px", fontSize:11, color:C.t3, flexShrink:0 }}>
+            🔐
           </button>
         )}
       </div>
 
-      {/* 로딩 */}
+      {/* 지역 필터 */}
+      <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"8px 14px", display:"flex", gap:6, overflowX:"auto", flexShrink:0 }}>
+        <button onClick={()=>{ setSelReg(null); setSelCo(null); }}
+          style={{ background:!selReg?C.accent:C.bg, color:!selReg?"#fff":C.t3, border:`1px solid ${!selReg?C.accent:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:!selReg?700:400, whiteSpace:"nowrap", flexShrink:0 }}>
+          전체
+        </button>
+        {Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([r,cnt])=>{
+          const col=RM[r]?.c||"#64748b", active=selReg===r;
+          return (
+            <button key={r} onClick={()=>{ setSelReg(active?null:r); setSelCo(null); setTab("list"); }}
+              style={{ background:active?col+"22":C.bg, color:active?col:C.t3, border:`1px solid ${active?col:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:active?700:400, whiteSpace:"nowrap", flexShrink:0 }}>
+              {r} {cnt}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 탭 메뉴 */}
+      <div style={{ background:C.card, borderBottom:`1px solid ${C.border}`, display:"flex", flexShrink:0 }}>
+        {[["list","📋 목록"],["map","🗺 지도"],["stats","📊 통계"]].map(([t,label])=>(
+          <button key={t} onClick={()=>setTab(t)}
+            style={{ flex:1, background:"none", border:"none", borderBottom:tab===t?`2px solid ${C.accent}`:"2px solid transparent", color:tab===t?C.accent:C.t3, padding:"10px 4px", fontSize:13, fontWeight:tab===t?700:400 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* 콘텐츠 */}
       {loading ? (
         <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:C.t3, fontSize:14 }}>
           데이터 불러오는 중...
         </div>
       ) : companies.length === 0 ? (
-        <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:C.t3, gap:12 }}>
-          <div style={{ fontSize:40 }}>📭</div>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:C.t3, gap:12, padding:24 }}>
+          <div style={{ fontSize:48 }}>📭</div>
           <div style={{ fontSize:15, fontWeight:600, color:C.t2 }}>등록된 거래처가 없습니다</div>
-          {!isAdmin && <div style={{ fontSize:12 }}>관리자가 엑셀 파일을 업로드하면 여기에 표시됩니다</div>}
+          <div style={{ fontSize:12, textAlign:"center" }}>관리자가 엑셀 파일을 업로드하면{"\n"}여기에 표시됩니다</div>
         </div>
       ) : (
-        /* 바디 */
-        <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+        <div style={{ flex:1, overflow:"hidden" }}>
 
-          {/* 좌측 패널 */}
-          <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", background:C.panel }}>
-            <div style={{ padding:"10px 12px", borderBottom:`1px solid ${C.border}`, display:"flex", flexWrap:"wrap", gap:5, background:C.card }}>
-              <button onClick={()=>{ setSelReg(null); setSelCo(null); }}
-                style={{ background:!selReg?C.accent:C.bg, color:!selReg?"#fff":C.t3, border:`1px solid ${!selReg?C.accent:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:!selReg?700:400 }}>
-                전체
-              </button>
-              {Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([r,cnt])=>{
-                const col=RM[r]?.c||"#64748b", active=selReg===r;
-                return (
-                  <button key={r} onClick={()=>{ setSelReg(active?null:r); setSelCo(null); }}
-                    style={{ background:active?col+"22":C.bg, color:active?col:C.t3, border:`1px solid ${active?col:C.border}`, borderRadius:6, padding:"4px 12px", fontSize:11, fontWeight:active?700:400 }}>
-                    {r} {cnt}
-                  </button>
-                );
-              })}
+          {/* 목록 탭 */}
+          {tab==="list" && (
+            <div style={{ height:"100%", overflowY:"auto" }}>
+              {filtered.length===0
+                ? <div style={{ padding:40, textAlign:"center", color:C.t3, fontSize:13 }}>검색 결과 없음</div>
+                : filtered.map(c=>{
+                    const col=RM[c.region]?.c||"#64748b";
+                    return (
+                      <div key={c.id} className="ccard" onClick={()=>setSelCo(c)}
+                        style={{ padding:"13px 16px", borderBottom:`1px solid ${C.border}`, cursor:"pointer", background:C.card, borderLeft:`3px solid ${col}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                          <div style={{ fontSize:14, fontWeight:600, color:C.t1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"70%" }}>{c.company}</div>
+                          <span style={{ fontSize:10, padding:"2px 8px", borderRadius:5, background:col+"22", color:col, border:`1px solid ${col}55`, flexShrink:0 }}>{c.region}</span>
+                        </div>
+                        {c.contact&&<div style={{ fontSize:12, color:C.t3, marginBottom:2 }}>👤 {c.contact}{c.title?` · ${c.title}`:""}</div>}
+                        {c.phone&&<div style={{ fontSize:12, color:C.accent, fontWeight:600 }}>📞 {c.phone}</div>}
+                        {c.address&&<div style={{ fontSize:11, color:C.t3, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>📍 {c.address}</div>}
+                      </div>
+                    );
+                  })
+              }
             </div>
+          )}
 
-            <div style={{ padding:"6px 16px", fontSize:11, color:C.t3, borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", background:C.card }}>
-              <span>{filtered.length}개 업체</span>
-              {selReg&&<span style={{ color:C.accent, fontWeight:600 }}>📍 {selReg}</span>}
-            </div>
+          {/* 지도 탭 */}
+          {tab==="map" && (
+            <KoreaMap counts={counts} selReg={selReg} onReg={r=>{ setSelReg(r); setTab("list"); }} filtered={filtered} selCo={selCo} onCo={setSelCo}/>
+          )}
 
-            <div style={{ flex:1, overflowY:"auto" }}>
-              {filtered.map(c=>{
-                const active=selCo?.id===c.id, col=RM[c.region]?.c||"#64748b";
-                return (
-                  <div key={c.id} className="ccard" onClick={()=>setSelCo(active?null:c)}
-                    style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, cursor:"pointer", background:active?"#f0f9ff":C.card, borderLeft:`3px solid ${active?col:"transparent"}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:active?col:C.t1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"66%" }}>{c.company}</div>
-                      <span style={{ fontSize:10, padding:"2px 8px", borderRadius:5, background:active?col+"22":C.bg, color:active?col:C.t3, border:`1px solid ${active?col:C.border}`, flexShrink:0 }}>{c.region}</span>
-                    </div>
-                    {c.contact&&<div style={{ fontSize:11, color:C.t3, marginBottom:2 }}>👤 {c.contact}{c.title?` · ${c.title}`:""}</div>}
-                    {c.address&&<div style={{ fontSize:11, color:C.t3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>📍 {c.address}</div>}
-                  </div>
-                );
-              })}
-            </div>
-
-            {selCo&&(
-              <div style={{ background:C.card, borderTop:`3px solid ${selColor}`, padding:16, flexShrink:0, boxShadow:"0 -2px 8px rgba(0,0,0,0.06)" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:selColor, maxWidth:"85%", lineHeight:1.4 }}>{selCo.company}</div>
-                  <button onClick={()=>setSelCo(null)} style={{ background:C.bg, border:`1px solid ${C.border}`, color:C.t3, borderRadius:5, width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>×</button>
-                </div>
-                {[["지역",selCo.region],["주소",selCo.address],["담당자",selCo.contact],["직책",selCo.title]].filter(([,v])=>v).map(([k,v])=>(
-                  <div key={k} style={{ display:"flex", gap:12, marginBottom:6, fontSize:12 }}>
-                    <span style={{ color:C.t3, whiteSpace:"nowrap", minWidth:36 }}>{k}</span>
-                    <span style={{ color:C.t2, lineHeight:1.5 }}>{v}</span>
-                  </div>
-                ))}
-                {selCo.phone&&(
-                  <div style={{ display:"flex", gap:12, fontSize:12, marginTop:4 }}>
-                    <span style={{ color:C.t3, whiteSpace:"nowrap", minWidth:36 }}>연락처</span>
-                    <a href={`tel:${selCo.phone}`} style={{ color:selColor, fontWeight:700, fontSize:13, textDecoration:"none" }}>📞 {selCo.phone}</a>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 우측 패널 */}
-          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div style={{ borderBottom:`1px solid ${C.border}`, padding:"0 20px", display:"flex", background:C.card }}>
-              {[["map","🗺  지도 보기"],["stats","📊  지역 통계"]].map(([t,label])=>(
-                <button key={t} onClick={()=>setTab(t)}
-                  style={{ background:"none", border:"none", borderBottom:tab===t?`2px solid ${C.accent}`:"2px solid transparent", color:tab===t?C.accent:C.t3, padding:"11px 20px", fontSize:13, fontWeight:tab===t?700:400, marginBottom:-1 }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div style={{ flex:1, overflow:"hidden" }}>
-              {tab==="map"
-                ? <KoreaMap counts={counts} selReg={selReg} onReg={r=>{ setSelReg(r); setSelCo(null); }} filtered={filtered} selCo={selCo} onCo={setSelCo}/>
-                : <StatsView counts={counts} selReg={selReg} total={companies.length}/>}
-            </div>
-          </div>
+          {/* 통계 탭 */}
+          {tab==="stats" && <StatsView counts={counts} total={companies.length}/>}
         </div>
+      )}
+
+      {/* 상세 모달 */}
+      <DetailModal co={selCo} onClose={()=>setSelCo(null)}/>
+
+      {/* 관리자 로그인 모달 */}
+      {showLogin && !isAdmin && (
+        <AdminLogin onLogin={()=>{ setIsAdmin(true); setShowLogin(false); }} onCancel={()=>setShowLogin(false)}/>
       )}
     </div>
   );
