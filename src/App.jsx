@@ -153,10 +153,15 @@ function AdminPanel({ onLogout, onRefresh, companies }) {
 
         // 기존 데이터 삭제
         await supabase.from("companies").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-        // 새 데이터 삽입
-        const { error } = await supabase.from("companies").insert(mapped);
-        if (error) { setMsg("❌ 업로드 실패: " + error.message); }
-        else { setMsg(`✅ ${mapped.length}개 업체 업로드 완료!`); onRefresh(); }
+        // 500개씩 나눠서 삽입
+        const chunkSize = 500;
+        let hasError = false;
+        for (let i = 0; i < mapped.length; i += chunkSize) {
+          const chunk = mapped.slice(i, i + chunkSize);
+          const { error } = await supabase.from("companies").insert(chunk);
+          if (error) { setMsg("❌ 업로드 실패: " + error.message); hasError = true; break; }
+        }
+        if (!hasError) { setMsg(`✅ ${mapped.length}개 업체 업로드 완료!`); onRefresh(); }
       } catch { setMsg("❌ 파일 처리 중 오류가 발생했습니다."); }
       setLoading(false);
     };
