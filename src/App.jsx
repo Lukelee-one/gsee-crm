@@ -281,16 +281,34 @@ function AdminPanel({onLogout,onRefresh,total}) {
   const [drag,setDrag]=useState(false),[loading,setLoading]=useState(false),[msg,setMsg]=useState("");
   const inputRef=useRef();
 
-  const geocode=async(address)=>{
+  const geocode=async(address, region)=>{
     if(!address) return {lat:null,lng:null};
+    // 한국 영역 (육지만)
+    const KR_BOUNDS={latMin:33.0,latMax:38.9,lngMin:124.5,lngMax:131.9};
+    const isInKorea=(lat,lng)=>lat>=KR_BOUNDS.latMin&&lat<=KR_BOUNDS.latMax&&lng>=KR_BOUNDS.lngMin&&lng<=KR_BOUNDS.lngMax;
+    // 바다인지 체크 (대략적인 한국 육지 범위)
+    const isOnLand=(lat,lng)=>{
+      // 동해 바다 제외
+      if(lng>129.5&&lat>35.5&&lat<38.0) return false;
+      // 남해 바다 제외  
+      if(lat<34.5&&lng>126.0&&lng<130.0) return false;
+      // 서해 바다 제외
+      if(lng<126.0&&lat>34.0&&lat<38.0) return false;
+      return true;
+    };
     try {
+      // 시도명 추출해서 검색어에 추가
       const q=encodeURIComponent(address+" 대한민국");
-      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3&countrycodes=kr`,{
         headers:{"Accept-Language":"ko","User-Agent":"GSEE-TECH-CRM/1.0"}
       });
       const data=await res.json();
-      if(data.length>0) return {lat:parseFloat(data[0].lat),lng:parseFloat(data[0].lon)};
+      for(const item of data){
+        const lat=parseFloat(item.lat), lng=parseFloat(item.lon);
+        if(isInKorea(lat,lng)&&isOnLand(lat,lng)) return {lat,lng};
+      }
     } catch {}
+    // 좌표를 못 찾으면 null 반환 → 지역 중심 사용
     return {lat:null,lng:null};
   };
 
