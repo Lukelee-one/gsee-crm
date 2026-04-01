@@ -283,10 +283,27 @@ function AdminPanel({onLogout,onRefresh,total}) {
 
   const geocode=async(address)=>{
     if(!address) return {lat:null,lng:null};
+    // 주소 전처리: 괄호/건물명/층호 제거하고 도로명+번지만 추출
+    const cleanAddr=(addr)=>{
+      let s=addr;
+      s=s.replace(/\([^)]*\)/g,"");        // (신방동) 제거
+      s=s.replace(/\s+\d+\s+[가-힣\w]+단지.*/,""); // 2109 천안산업기자재유통단지... 제거
+      s=s.replace(/\s+[가-힣]+동\s+\d+.*/,"");     // 동 이후 번지 제거
+      s=s.replace(/\s+(제\s*)?\d+[동층호관]+.*/,""); // 제2동, 1층, 102호 등 제거
+      s=s.replace(/\s+B?\d+F?.*/,"");      // B1, 2F 등 제거
+      return s.trim();
+    };
     try {
-      const res=await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+      const cleaned=cleanAddr(address);
+      const res=await fetch(`/api/geocode?address=${encodeURIComponent(cleaned)}`);
       const data=await res.json();
       if(data.lat) return {lat:parseFloat(data.lat),lng:parseFloat(data.lng)};
+      // 실패 시 시+구만으로 재시도
+      const parts=cleaned.split(/\s+/);
+      const short=parts.slice(0,3).join(" ");
+      const res2=await fetch(`/api/geocode?address=${encodeURIComponent(short)}`);
+      const data2=await res2.json();
+      if(data2.lat) return {lat:parseFloat(data2.lat),lng:parseFloat(data2.lng)};
     } catch {}
     return {lat:null,lng:null};
   };
