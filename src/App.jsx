@@ -284,26 +284,9 @@ function AdminPanel({onLogout,onRefresh,total}) {
   const geocode=async(address)=>{
     if(!address) return {lat:null,lng:null};
     try {
-      const q=encodeURIComponent(address);
-      const res=await fetch(
-        `https://dapi.kakao.com/v2/local/search/address.json?query=${q}&analyze_type=similar`,
-        { headers:{ "Authorization":"KakaoAK c1427d6e5bde83ce8b8aee89e7728541" } }
-      );
+      const res=await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
       const data=await res.json();
-      if(data.documents&&data.documents.length>0){
-        const d=data.documents[0];
-        return {lat:parseFloat(d.y),lng:parseFloat(d.x)};
-      }
-      // 주소 검색 실패 시 키워드 검색 시도
-      const res2=await fetch(
-        `https://dapi.kakao.com/v2/local/search/keyword.json?query=${q}&size=1`,
-        { headers:{ "Authorization":"KakaoAK c1427d6e5bde83ce8b8aee89e7728541" } }
-      );
-      const data2=await res2.json();
-      if(data2.documents&&data2.documents.length>0){
-        const d=data2.documents[0];
-        return {lat:parseFloat(d.y),lng:parseFloat(d.x)};
-      }
+      if(data.lat) return {lat:parseFloat(data.lat),lng:parseFloat(data.lng)};
     } catch {}
     return {lat:null,lng:null};
   };
