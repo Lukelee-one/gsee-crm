@@ -281,34 +281,30 @@ function AdminPanel({onLogout,onRefresh,total}) {
   const [drag,setDrag]=useState(false),[loading,setLoading]=useState(false),[msg,setMsg]=useState("");
   const inputRef=useRef();
 
-  const geocode=async(address, region)=>{
+  const geocode=async(address)=>{
     if(!address) return {lat:null,lng:null};
-    // 한국 영역 (육지만)
-    const KR_BOUNDS={latMin:33.0,latMax:38.9,lngMin:124.5,lngMax:131.9};
-    const isInKorea=(lat,lng)=>lat>=KR_BOUNDS.latMin&&lat<=KR_BOUNDS.latMax&&lng>=KR_BOUNDS.lngMin&&lng<=KR_BOUNDS.lngMax;
-    // 바다인지 체크 (대략적인 한국 육지 범위)
-    const isOnLand=(lat,lng)=>{
-      // 동해 바다 제외
-      if(lng>129.5&&lat>35.5&&lat<38.0) return false;
-      // 남해 바다 제외  
-      if(lat<34.5&&lng>126.0&&lng<130.0) return false;
-      // 서해 바다 제외
-      if(lng<126.0&&lat>34.0&&lat<38.0) return false;
-      return true;
-    };
     try {
-      // 시도명 추출해서 검색어에 추가
-      const q=encodeURIComponent(address+" 대한민국");
-      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3&countrycodes=kr`,{
-        headers:{"Accept-Language":"ko","User-Agent":"GSEE-TECH-CRM/1.0"}
-      });
+      const q=encodeURIComponent(address);
+      const res=await fetch(
+        `https://dapi.kakao.com/v2/local/search/address.json?query=${q}&analyze_type=similar`,
+        { headers:{ "Authorization":"KakaoAK c1427d6e5bde83ce8b8aee89e7728541" } }
+      );
       const data=await res.json();
-      for(const item of data){
-        const lat=parseFloat(item.lat), lng=parseFloat(item.lon);
-        if(isInKorea(lat,lng)&&isOnLand(lat,lng)) return {lat,lng};
+      if(data.documents&&data.documents.length>0){
+        const d=data.documents[0];
+        return {lat:parseFloat(d.y),lng:parseFloat(d.x)};
+      }
+      // 주소 검색 실패 시 키워드 검색 시도
+      const res2=await fetch(
+        `https://dapi.kakao.com/v2/local/search/keyword.json?query=${q}&size=1`,
+        { headers:{ "Authorization":"KakaoAK c1427d6e5bde83ce8b8aee89e7728541" } }
+      );
+      const data2=await res2.json();
+      if(data2.documents&&data2.documents.length>0){
+        const d=data2.documents[0];
+        return {lat:parseFloat(d.y),lng:parseFloat(d.x)};
       }
     } catch {}
-    // 좌표를 못 찾으면 null 반환 → 지역 중심 사용
     return {lat:null,lng:null};
   };
 
